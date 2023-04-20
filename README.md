@@ -1,5 +1,7 @@
 This curriculum is copied from [Melanie Walsh's *Introduction to Cultural Analytics & Python*](https://melaniewalsh.github.io/Intro-Cultural-Analytics/05-Text-Analysis/09-Topic-Modeling-Without-Mallet.html). However, the dataset is different. This script uses the U.S. Inaugural Addresses corpus, which is available for download [here](https://melaniewalsh.github.io/Intro-Cultural-Analytics/_downloads/64e2547e2d86c20cc2a74f660143cfeb/US_Inaugural_Addresses.zip). 
 
+We also use `NLTK` instead of using `little_mallet_wrapper` to clean and normalize our text
+
 # Topic Modeling — With Tomotopy
 
 In this workshop, we're learning about a text analysis method called *topic modeling*. This method will help us identify the main topics or discourses within a collection of texts or single text that has been separated into smaller text chunks.
@@ -17,14 +19,7 @@ ___
 # !pip install tomotopy
 ```
 
-
-```python
-# !pip install little_mallet_wrapper
-```
-
-Note: A “wrapper” is a Python package that makes complicated code easier to use and/or makes code from a different programming language accessible in Python.
-
-Since Little MALLET Wrapper also uses the data visualization library seaborn, we’re also going to pip install seaborn:
+We’re also going to pip install the data visualization library seaborn:
 
 
 ```python
@@ -33,20 +28,22 @@ Since Little MALLET Wrapper also uses the data visualization library seaborn, we
 
 ## Import Packages
 
-Now let's import `tomotopy`, `little_mallet_wrapper` and the data viz library `seaborn`.
+Now let's import `tomotopy` and the data viz library `seaborn`.
 
 We're also going to import [`glob`](https://docs.python.org/3/library/glob.html) and [`pathlib`](https://docs.python.org/3/library/pathlib.html#basic-use) for working with files and the file system.
 
-Finally, we will also import `pandas` to organize our data
+Finally, we will also import `pandas` to organize our data and `NLTK` to clean and normalize our text
 
 
 ```python
 import tomotopy as tp
-import little_mallet_wrapper
 import seaborn
 import glob
 from pathlib import Path
 import pandas as pd
+import nltk
+from nltk.corpus import stopwords
+stops = stopwords.words('english')
 ```
 
 ## Get Training Data From Text Files
@@ -91,8 +88,12 @@ titles = []
 
 for file in files:
     text = open(file, encoding='utf-8').read()
-    processed_text = little_mallet_wrapper.process_string(text, numbers='remove')
-    training_data.append(processed_text)
+    text_tokens = nltk.word_tokenize(text)
+    nltk_text = nltk.Text(text_tokens)
+    text_lower = [t.lower() for t in nltk_text if t.isalpha()]
+    text_stops = [t for t in text_lower if t not in stops]
+    text_string = ' '.join(text_stops)
+    training_data.append(text_string)
     original_texts.append(text)
     titles.append(Path(file).stem)
 ```
@@ -114,16 +115,20 @@ num_topic_words = 10
 # Intialize the model
 model = tp.LDAModel(k=num_topics)
 
-# Add each document to the model, after splitting it up into words
+# Add each document to the model, after removing white space (strip) 
+# and splitting it up into words (split)
 for text in training_data:
     model.add_doc(text.strip().split())
     
+# The log-likelihood function is typically used to 
+# derive the maximum likelihood estimator of the parameter  
 print("Topic Model Training...\n\n")
 # Iterate over the data 10 times
 iterations = 10
 for i in range(0, 100, iterations):
     model.train(iterations)
     print(f'Iteration: {i}\tLog-likelihood: {model.ll_per_word}')
+    
 
 print("\nTopic Model Results:\n\n")
 # Print out top 10 words for each topic
@@ -150,12 +155,16 @@ Make functions for displaying top documents. The `get_top_docs()` function is ta
 
 ```python
 from IPython.display import Markdown, display
+# IPython means interactive Python. It is an interactive command-line terminal for Python.
 import re
+# A RegEx, or Regular Expression, is a sequence of characters that forms a search pattern.
+# RegEx can be used to check if a string contains the specified search pattern.
 
 def make_md(string):
     display(Markdown(str(string)))
 
 def get_top_docs(docs, topic_distributions, topic_index, n=5):
+#     The zip() function takes iterables (can be zero or more), aggregates them in a tuple, and returns it.
     
     sorted_data = sorted([(_distribution[topic_index], _document) 
                           for _distribution, _document 
@@ -213,6 +222,7 @@ def plot_categories_by_topics_heatmap(labels,
                                       dim=None):
     
     # Combine the labels and distributions into a list of dictionaries.
+#     The zip() function takes iterables (can be zero or more), aggregates them in a tuple, and returns it.
     dicts_to_plot = []
     for _label, _distribution in zip(labels, topic_distributions):
         if not target_labels or _label in target_labels:
@@ -279,15 +289,10 @@ df
 
 
 ```python
-df.sort_values(by='Topic 3 never well liberty would', ascending=False)[:6]
+df.sort_values(by='Topic 3 government shall duty may', ascending=False)[:6]
 ```
 
 
 ```python
 df.to_csv('Topic-Distributions.csv', encoding='utf-8', index=False)
-```
-
-
-```python
-
 ```
